@@ -17,6 +17,9 @@ public:
 	archive(const string& input, const string& output);
 	void BuildDict();
 	void Compress();
+	void Decompress();
+	friend archive CreateArchive(const int& argc, char* argv[]);
+	friend map<int, string> InvertMap(const map<string, int>& x);
 };
 
 archive::archive(const string& input, const string& output) {
@@ -108,7 +111,7 @@ void archive::Compress() {
 			//cout << "\n\nbegin\n\n" << temp_s << "\n\n" << temp_s.c_str() << "\n\nend\n\n";
 			//Записываю в файл тот буфер, который имеется на данный момент
 			int temp_t = dict[temp_s];
-			out.write((char*)& temp_t, sizeof(temp_t));
+			out.write((char*)&temp_t, sizeof(temp_t));
 			//out << temp_t;
 
 			//Делаю новую запись в словаре с данной строкой
@@ -128,12 +131,64 @@ void archive::Compress() {
 
 	cout << "Compressed file " << input << "!" << endl;
 }
+void archive::Decompress() {
+}
+archive CreateArchive(const int& argc, char* argv[]) {
+	if (argc == 3) {
+		string output = argv[1];
+		output += ".lzw";
+		archive Archive(argv[2], output);
+		return Archive;
+	}
+	else if (argc == 2) {
+		string input = argv[1];
+		for (int i = 0; i < 5; i++) {
+			input.pop_back();
+		}
+		archive Archive(input, argv[1]);
+		return Archive;
+	}
+	else {
+		throw runtime_error("Wrong input");
+	}
+}
+map<int, string> InvertMap(const map<string, int>& x) {
+	map<int, string> result;
+	for (const auto& item : x) {
+		result[item.second] = item.first;
+	}
+	return result;
+}
+void Process(archive& Archive, const string& command) {
+	if (command == "--compress") {
+		Archive.BuildDict();
+		Archive.Compress();
+	}
+	else if (command == "--decompress") {
+		Archive.Decompress();
+	}
+}
 
-int main() {
-	string input = "C:\\a\\w.txt";
-	archive Archive(input, input + ".lzw");
-	Archive.BuildDict();
-	Archive.Compress();
+int main(int argc, char* argv[]) {
+	//Создаем архив
+	archive Archive = CreateArchive(argc, argv);
+	//Выполняем или компрессию, или декомпрессию, в зависимости от указанной комманды
+	Process(Archive, argv[0]);
+
+	////Кусок кода для работы компрессора изнутри программы
+	//string input = "C:\\a\\w.txt";
+	//archive Archive(input, input + ".lzw");
+	//Archive.BuildDict();
+	//Archive.Compress();
+
+	////Кусок кода для работы декомпрессора изнутри программы
+	//string output = "C:\\a\\w.txt.lzw";
+	//string input = output;
+	//for (int i = 0; i < 5; i++) {
+	//	input.pop_back();
+	//}
+	//archive Archive(input, output);
+
 	system("pause");
 	return 0;
 }
