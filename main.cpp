@@ -21,14 +21,14 @@ class archive
 	ifstream input; //входной файл
 public:
 	void compress(char const**, int); //сжатие
-	string compress1(string);// сжатие 77
-	int len(int); //???
+	string compress1(string);// сжатие 78
+	int len(int); //та же функция для вычисления длины "бинарной строки"
 	string to_binary_string(unsigned long int, int); // перевод в бинарное значение
 	string write_bits(string);
 	void decompress(string); //деархивация
 	int bits_to_int(string); //биты в инт. Используем при деархивации
 	string get_bits(int); // получаем биты. Используем при деархивации
-	void write_decompress(string&); //??
+	void write_decompress(string&); //декомпрессия
 	void cache_in();//получаение размера файла
 	~archive();
 	archive() {};
@@ -49,7 +49,6 @@ int archive::bits_to_int(string bits)
 	while (bits[i] == 0)
 		i++;
 
-	//
 	for (; i < size; i++)
 	{
 		result += (int(bits[i]) - int('0')) * int(pow(2, size - i - 1));
