@@ -3,20 +3,22 @@
 #include <math.h>
 #include <vector>
 #include <bitset>
+#include <algorithm>
 #include <limits>
-#include <map>
+#include <unordered_map>
 
 using namespace std;
 using byte = unsigned char;
 using bits_in_byte = bitset<size_t(8)>;
 constexpr std::size_t BITS_PER_BYTE = std::numeric_limits<byte>::digits;
-typedef map<string, int>  Map; // упрощение, чтобы не писать полностью объявление словаря
+typedef unordered_map<string, int>  Map; // упрощение, чтобы не писать полностью объявление словаря
 
 
 class archive
 {
 	string buffer; // буфер для хранения
-
+	char *buffer1;
+	long size;
 	ofstream output; // выходной файл
 	ifstream input; //входной файл
 public:
@@ -60,28 +62,46 @@ string archive::get_bits(int lenght)
 	buffer.erase(0, lenght);
 	return result;
 }
-//получаение размера файла
-void archive::cache_in()
-{
-	char c;
-	buffer = "";
-	while (!input.eof())
-	{
-		input.get(c);
-		buffer += bits_in_byte(byte(c)).to_string();
-	}
-	/*cout << "caching completed ..." << endl;
-	cout << "starting size: " << buffer.size() << endl;*/
-}
+//void archive::cache_in()
+//{
+//	char c;
+//	buffer = "";
+//	while (!input.eof())
+//	{
+//		input.get(c);
+//		buffer += bits_in_byte(byte(c)).to_string();
+//	}
+//	/*cout << "caching completed ..." << endl;
+//	cout << "starting size: " << buffer.size() << endl;*/
+//}
 //деархивация
 void archive::decompress(string path)
 {
 	//считываем файлик
-	input.open(path, ios::binary);
-	cache_in();
+	input.open(path, ios::binary | ios::ate);
+
+	input.seekg(0, input.end);
+	size = input.tellg();
+	input.seekg(0, input.beg);
+	
+	buffer1 = new char[size*8];
+
+	int temp = 0;
+	char c;
+	string temp_s;
+	int ii = 0;
+	while (!input.eof()) {
+		input.get(c);
+		temp_s = bits_in_byte(byte(c)).to_string();
+		int length = strlen(temp_s.c_str());
+		memcpy(buffer1+ii, temp_s.c_str(), length);
+		ii += length;
+	}
+
+	string buffer(buffer1);
 
 	//инициализация переменных
-	string buff = "", newItem;
+	string buff = "", newItem = "";
 	string result = "";
 	int i = 0, k = 0;
 
@@ -97,23 +117,27 @@ void archive::decompress(string path)
 
 	//плюсуем значение второго поля в векторе(в данном случае, первый бит) в строку "результат"
 	result.append(dictionary[1]);
-
+	cout << "Entering the loop" << endl;
 	//циклик
 	while (!buffer.empty())
 	{
 		for (int j = 0; j < pow(2, k) && !buffer.empty(); j++)
 		{
+			cout << "Inside" << endl;
 			//Получаем определенное кол-во битов
 			buff = get_bits(k + 2);
 			i += k + 2;
+			cout << "part 1" << endl;
 			//Достаем из словарика строку
 			newItem = dictionary[bits_to_int(buff.substr(0, k + 1))];
 			if (buff.size() > k + 1)
 				newItem += buff.substr(k + 1);
+			cout << "part 2" << endl;
 			//Пушим строку в словарик
 			dictionary.push_back(newItem);
 			//Добавляем строку к строке "результат"
 			result.append(newItem);
+			cout << "part 3" << endl;
 		}
 		k++;
 	}
