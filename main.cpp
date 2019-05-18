@@ -78,34 +78,107 @@ void archive::cache_in()
 	cout << "caching completed ..." << endl;
 	cout << "starting size: " << buffer.size() << endl;
 }
-void archive::Decompress() {
-}
-archive CreateArchive(const int& argc, char* argv[]) {
-	if (argc == 3) {
-		string output = argv[1];
-		output += ".lzw";
-		archive Archive(argv[2], output);
-		return Archive;
-	}
-	else if (argc == 2) {
-		string input = argv[1];
-		for (int i = 0; i < 5; i++) {
-			input.pop_back();
+//деархивация
+void archive::decompress(string path)
+{
+	//считываем файлик
+	input.open(path, ios::binary);
+	cache_in();
+
+	//инициализация переменных
+	string buff = "", newItem;
+	string result = "";
+
+	//Создаем первое поле в векторе стрингОв "словарик" - пустая строка
+	vector<string> dictionary;
+	dictionary.push_back(buff);
+
+	//опять инициализация переменных
+	int i = 0, k = 0;
+
+	//получаем первый бит
+	buff = get_bits(1);
+
+	//пушим его в "словарик"
+	dictionary.push_back(buff);
+
+	//плюсуем значение второго поля в векторе(в данном случае, первый бит) в строку "результат"
+	result.append(dictionary[1]);
+
+	//циклик
+	while (!buffer.empty())
+	{
+		for (int j = 0; j < pow(2, k) && !buffer.empty(); j++)
+		{
+			//Получаем определенное кол-во битов
+			buff = get_bits(k + 2);
+			i += k + 2;
+			//Достаем из словарика строку
+			newItem = dictionary[bits_to_int(buff.substr(0, k + 1))];
+			if (buff.size() > k + 1)
+				newItem += buff.substr(k + 1);
+			//Пушим строку в словарик
+			dictionary.push_back(newItem);
+			//Добавляем строку к строке "результат"
+			result.append(newItem);
 		}
-		archive Archive(input, argv[1]);
-		return Archive;
+		k++;
 	}
-	else {
-		throw runtime_error("Wrong input");
+	//Непосредственно записи
+	write_decompress(result);
+}
+
+void archive::write_decompress(string & bitstring)
+{
+	//имя файла
+	string filename = "";
+	
+	//размер файла
+	int size_of_file; 
+	int i = 0, limit = bitstring.size() - bitstring.size() % 8;
+	char c;
+
+	//цикл до конца файла
+	while (i + 8 < limit)
+	{
+		c = bits_in_byte(bitstring.substr(i, BITS_PER_BYTE)).to_ulong();
+		i += 8;
+		//Пока не "конец записанного файла", а-ля "звук", то
+		while (c != '\a' && i + 8 < limit)
+		{
+			filename += c;
+			c = bits_in_byte(bitstring.substr(i, BITS_PER_BYTE)).to_ulong();
+			i += 8;
+		}
+		cout << "Getting out file " << filename << endl;
+		ofstream out(filename, ios::binary);
+		if (!out.is_open()) cout << "... Done!" << endl;
+		else cout << "... Error!" << endl;
+
+		//Сколько нужно записывать
+		size_of_file = bits_to_int(bitstring.substr(i, 64));
+		i += 64;
+
+		//Собираем батик
+		c = bits_in_byte(bitstring.substr(i, BITS_PER_BYTE)).to_ulong();
+		//Адаптируем к "сборке" ^ счетчик
+		i += 8;
+		size_of_file -= 8;
+		//Цикл до конца файла
+		while (size_of_file > 0)
+		{
+			out << c;
+			//Записываем по байтику
+			c = bits_in_byte(bitstring.substr(i, BITS_PER_BYTE)).to_ulong();
+			i += 8;
+			size_of_file -= 8;
+		}
+		//закрываем файлик
+		out.close();
+		filename = "";
 	}
 }
-map<int, string> InvertMap(const map<string, int>& x) {
-	map<int, string> result;
-	for (const auto& item : x) {
-		result[item.second] = item.first;
-	}
-	return result;
-}//архивация
+//архивация
 void archive::compress(char const** argv, int argc)
 {
 	string bitstring = "";
