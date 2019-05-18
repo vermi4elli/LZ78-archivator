@@ -16,13 +16,12 @@ typedef map<string, int>  Map; // упрощение, чтобы не писат
 class archive
 {
 	string buffer; // буфер для хранения
-	int pos; // позиция в словаре
 
 	ofstream output; // выходной файл
 	ifstream input; //входной файл
 public:
 	void compress(char const**, int); //сжатие
-	string compress1(string);// сжатие 77
+	string compress1(string);// сжатие 78
 	int len(int);  //та же функция для вычисления длины "бинарной строки"
 	string to_binary_string(unsigned long int, int); // перевод в бинарное значение
 	string write_bits(string);
@@ -194,7 +193,7 @@ void archive::compress(char const** argv, int argc)
 	cout << endl;
 	//записывам результат в новый файл
 	output.open(argv[argc - 1], ios::binary);
-	for (std::size_t i = 0; i < bitstring.size(); i += BITS_PER_BYTE)
+	for (size_t i = 0; i < bitstring.size(); i += BITS_PER_BYTE)
 	{
 		byte b = bits_in_byte(bitstring.substr(i, BITS_PER_BYTE)).to_ulong();
 		output << b;
