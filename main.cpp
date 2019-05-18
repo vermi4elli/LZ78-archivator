@@ -70,8 +70,8 @@ void archive::cache_in()
 		input.get(c);
 		buffer += bits_in_byte(byte(c)).to_string();
 	}
-	cout << "caching completed ..." << endl;
-	cout << "starting size: " << buffer.size() << endl;
+	/*cout << "caching completed ..." << endl;
+	cout << "starting size: " << buffer.size() << endl;*/
 }
 //деархивация
 void archive::decompress(string path)
@@ -178,7 +178,7 @@ void archive::compress(char const** argv, int argc)
 	//открываем файл и записываем его содержимое в виде битов в строку для хранения
 	for (int i = 2; i < argc - 1; i++)
 	{
-		cout << "Compressing file " << argv[i] << "... Done."; 
+		cout << "Compressing file " << argv[i] << "... Done!" << endl;
 		input.open(argv[i], ios::binary);
 		bitstring += write_bits(argv[i]);
 		input.close();
@@ -190,7 +190,6 @@ void archive::compress(char const** argv, int argc)
 	{
 		bitstring += '0';
 	}
-	cout << endl;
 	//записывам результат в новый файл
 	output.open(argv[argc - 1], ios::binary);
 	for (size_t i = 0; i < bitstring.size(); i += BITS_PER_BYTE)
@@ -205,7 +204,6 @@ string archive::write_bits(string filename)
 	string buff = ""; // для хранения содержимого
 	string bitstring = ""; // для хранения имени файла, а после и всей последовательности байтов в файле
 	char c;
-	cout << "filename: " << filename << " ..." << endl; //выводим имя файла
 	for (size_t i = 0; i < filename.size(); i++) //проходимся по размеру имени файла
 	{
 		bitstring += bits_in_byte(byte(filename.at(i))).to_string(); //переводим биты в байты
@@ -214,7 +212,7 @@ string archive::write_bits(string filename)
 	while (input.get(c)) {
 		buff += bits_in_byte(byte(c)).to_string(); //переводим биты в байты
 	}
-	cout << "size of file (without name): " << buff.size() << endl; // выводим размер файла (без имени)
+	//cout << "size of file (without name): " << buff.size() << endl; // выводим размер файла (без имени)
 	bitstring += to_binary_string(buff.size(), 64); // переводим биты в байты
 	bitstring.append(buff); // добавляем содержимое файла в байтах в последовательность байтов файла
 	return bitstring;
@@ -276,16 +274,17 @@ int main(int argc, char const* argv[])
 	archive win; // создаем переменную win))))
 
 	string parameter(argv[1]); // получаем параметр
-	cout << parameter << endl;//выводим параметр
-
+	
 	if (parameter == "--decompress") // деархивация
 	{
 		string path_to_archive(argv[2]);
 		win.decompress(path_to_archive);
+		cout << "1 file written" << endl;
 	}
 	if (parameter == "--compress") // архивация
 	{
 		win.compress(argv, argc);
+		cout << "Result written to " << argv[argc - 1] << endl;
 	}
 	return 0;
 }
