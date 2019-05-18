@@ -1,70 +1,82 @@
 #include <iostream>
-#include <map>
-#include <string>
-#include <sstream>
 #include <fstream>
+#include <math.h>
+#include <vector>
+#include <bitset>
+#include <limits>
+#include <map>
+
 using namespace std;
+using byte = unsigned char;
+using bits_in_byte = bitset<size_t(8)>;
+constexpr std::size_t BITS_PER_BYTE = std::numeric_limits<byte>::digits;
+typedef map<string, int>  Map; // упрощение, чтобы не писать полностью объявление словаря
 
-class archive {
-private:
-	int size;
-	int counter;
-	string debug;
-	string input;
-	string output;
-	map<string, int> dict_original;
+
+class archive
+{
+	string buffer; // буфер для хранения
+
+	ofstream output; // выходной файл
+	ifstream input; //входной файл
 public:
-	archive(const string& input, const string& output);
-	void BuildDict();
-	void Compress();
-	void Decompress();
-	friend archive CreateArchive(const int& argc, char* argv[]);
-	friend map<int, string> InvertMap(const map<string, int>& x);
+	void compress(char const**, int); //сжатие
+	string compress1(string);// сжатие 77
+	int len(int); //???
+	string to_binary_string(unsigned long int, int); // перевод в бинарное значение
+	string write_bits(string);
+	void decompress(string); //деархивация
+	int bits_to_int(string); //биты в инт. Используем при деархивации
+	string get_bits(int); // получаем биты. Используем при деархивации
+	void write_decompress(string&); //??
+	void cache_in();//получаение размера файла
+	~archive();
+	archive() {};
 };
-
-archive::archive(const string& input, const string& output) {
-	this->input = input;
-	this->output = output;
-	counter = 0;
-	size = 0;
+archive::~archive()
+{
+	//закрытие файлов во избежание утечки кармы
+	if (output.is_open()) output.close();
+	if (input.is_open()) input.close();
 }
-void archive::BuildDict() {
-	//cout << "\n\nFilling the dictionary...\n";
-
-	//Создал входящий поток
-	ifstream stream(input, ios::binary);
+//биты в инт. Используем при деархивации
+int archive::bits_to_int(string bits)
+{
+	//инициализация переменных
+	int result = 0, i = 0, size = bits.size();
 	
-	//Создал переменную строку и проинициализировал 1 символом
-	//т.к. в цикле while ниже я первым делом вызываю pop_back() у строки
-	string temp = ".";
+	//смещение на первый ненулевой бит
+	while (bits[i] == 0)
+		i++;
 
-	//просто символ, который будет таскать символы из файла
-	char x;
-
-	while (stream) {
-		//очищаю строку
-		temp.pop_back();
-
-		//получаю символ из файла и пушу его в строку
-		stream.get(x);
-		temp.push_back(x);
-
-		//проверяю словарь на наличие совпадений
-		//если есть, то следующая итерация
-		if (dict_original.find(temp) != dict_original.end()) continue;
-
-		//иначе создаю пару в словаре и вывожу на экран(при отладке)
-		dict_original[temp] = ++counter;
-		//cout << temp << " " << dict_original[temp] << endl;
+	//
+	for (; i < size; i++)
+	{
+		result += (int(bits[i]) - int('0')) * int(pow(2, size - i - 1));
 	}
-	
-	//закрываю файл
-	stream.close();
-
-	//запоминаю размер "оригинального" словаря(односимвольных уникальных фраз)
-	size = dict_original.size();
-
-	//cout << "Filled the dictionary!\n" << endl;
+	return result;
+}
+//получаем биты. Используем при деархивации
+string archive::get_bits(int lenght)
+{
+	// if (buffer.empty())
+	//     return "";
+	string result = buffer.substr(0, lenght);
+	buffer.erase(0, lenght);
+	return result;
+}
+//получаение размера файла
+void archive::cache_in()
+{
+	char c;
+	buffer = "";
+	while (!input.eof())
+	{
+		input.get(c);
+		buffer += bits_in_byte(byte(c)).to_string();
+	}
+	cout << "caching completed ..." << endl;
+	cout << "starting size: " << buffer.size() << endl;
 }
 void archive::Compress() {
 	cout << "\n\nCompressing file " << input << "...\n";
