@@ -78,71 +78,6 @@ void archive::cache_in()
 	cout << "caching completed ..." << endl;
 	cout << "starting size: " << buffer.size() << endl;
 }
-void archive::Compress() {
-	cout << "\n\nCompressing file " << input << "...\n";
-
-	//Создаю два файловых потока
-	ifstream in(input, ios::binary);
-	ofstream out(output);
-
-	//Так мы записываем кол-во элементов в словаре
-	//(или сколько нужно итераций цикла для алгоритма декомпресса)
-	out.write((char*)& size, sizeof(size));
-	//out << size;
-
-	//После записи кол-ва элементов, записываем все элементы словаря
-	//(так, как используем std::map, а это r&b tree, то они будут по порядку)
-	//Таким образом, при декомпрессинге, мы сможем заполнить заново "односимвольный" словарь
-	// просто прочитав ту часть файла, которую запишем
-	for (const auto& item : dict_original) {
-		out.write((char*)& item.first, sizeof(item.first));
-		//out << item.first;
-	}
-
-	//Создал второй словарь, который уже сможет хранить многосимвольные фразы
-	map<string, int> dict = dict_original;
-
-	//Создал переменную строку(буфер) и указатель на чары(ниже в алгоритме пояснено)
-	string temp_s;
-	char* temp;
-
-	//просто символ, который будет таскать символы из файла
-	char temp_c;
-
-	//Теперь алгоритм компресса самого файла
-	while (in) {
-		//Получаю из файла символ
-		in.get(temp_c);
-
-		//Если есть совпадение буфер+символ в словаре, прибавляю его в буфер и к следующей итерации
-		if (dict.find(temp_s + to_string(temp_c)) != dict.end()) {
-			temp_s += to_string(temp_c);
-		}
-		//Если же нет совпадения, то
-		else {
-			//cout << "\n\nbegin\n\n" << temp_s << "\n\n" << temp_s.c_str() << "\n\nend\n\n";
-			//Записываю в файл тот буфер, который имеется на данный момент
-			int temp_t = dict[temp_s];
-			out.write((char*)&temp_t, sizeof(temp_t));
-			//out << temp_t;
-
-			//Делаю новую запись в словаре с данной строкой
-			dict[temp_s + to_string(temp_c)] = ++counter;
-
-			//Буфер очищается и приравнивается к текущему значению последнего символа
-			temp_s = to_string(temp_c);
-		}
-	}
-
-	//закрываю файлы
-	in.close();
-	out.close();
-
-	//Обнуляю счетчик для возможного декомпрессинга
-	counter = 0;
-	
-	cout << "Compressed file " << input << "!" << endl;
-}
 void archive::Decompress() {
 }
 archive CreateArchive(const int& argc, char* argv[]) {
@@ -170,37 +105,135 @@ map<int, string> InvertMap(const map<string, int>& x) {
 		result[item.second] = item.first;
 	}
 	return result;
-}
-void Process(archive& Archive, const string& command) {
-	if (command == "--compress") {
-		Archive.BuildDict();
-		Archive.Compress();
+}//архивация
+void archive::compress(char const** argv, int argc)
+{
+	string bitstring = "";
+	//*********************************
+	//открываем файл и записываем его содержимое в виде битов в строку для хранения
+	for (int i = 2; i < argc - 1; i++)
+	{
+		cout << "Compressing file " << argv[i] << "... ";
+		input.open(argv[i], ios::binary);
+		if (!input.is_open()) {
+			cout << "Error!" << endl;
+			continue;
+		}
+		bitstring += write_bits(argv[i]);
+		input.close();
+		cout << "Done!" << endl;
 	}
-	else if (command == "--decompress") {
-		Archive.Decompress();
+	bitstring = compress1(bitstring); // архивируем содержимое
+	bitstring.erase(0, 1); //перепроверяем-с bitstring на чистоту
+	
+	//Завершаем незавершенный байт, если таковой имеется
+	while (bitstring.size() % BITS_PER_BYTE)
+	{
+		cout << "0";
+		bitstring += '0';
+	}
+	cout << endl;
+
+	//записывам результат в новый файл
+	output.open(argv[argc - 1], ios::binary);
+	for (size_t i = 0; i < bitstring.size(); i += BITS_PER_BYTE)
+	{
+		byte b = bits_in_byte(bitstring.substr(i, BITS_PER_BYTE)).to_ulong();
+		output << b;
 	}
 }
 
-int main(int argc, char* argv[]) {
-	//Создаем архив
-	archive Archive = CreateArchive(argc, argv);
-	//Выполняем или компрессию, или декомпрессию, в зависимости от указанной комманды
-	Process(Archive, argv[0]);
+//получаем биты для файла и его имени
+string archive::write_bits(string filename)
+{
+	string buff = ""; // для хранения содержимого
+	string bitstring = ""; // для хранения имени файла, а после и всей последовательности байтов в файле
+	char c;
+	for (size_t i = 0; i < filename.size(); i++) //проходимся по размеру имени файла
+	{
+		bitstring += bits_in_byte(byte(filename.at(i))).to_string(); //переводим биты в байты
+	}
+	bitstring += bits_in_byte(byte('\a')).to_string();//добавляем после названия файла битовое значение ЗВУКОВОГО СИГНАЛА для того, чтобы отделить название файла и его содержимое. При архивации и деархивации будет звуковой сигнал показывающий что файл успешно открыт
+	
+	while (input.get(c)) {
+		buff += bits_in_byte(byte(c)).to_string(); //переводим биты в байты
+	}
+	bitstring += to_binary_string(buff.size(), 64); // переводим биты в байты
+	bitstring.append(buff); // добавляем содержимое файла в байтах в последовательность байтов файла
+	return bitstring;
+}
+//процесс архивации LZ78
+string archive::compress1(string bitstring)
+{
+	string buff = "";
+	string result = "";
+	Map dictionary = {};// словарь для хранения фраза, позиция в "словарике"
+	dictionary.insert(pair<string, int>("", 0)); //пушим пустую строку ключом 0
+	//ну и цикл, собственно, компрессирования
+	for (int i = 0; i < bitstring.size(); i++) // идем по строке
+	{ 
+		if (dictionary.find(buff + bitstring.at(i)) != dictionary.end()) // если есть совпадение "временная строка" + "текущий символ" в словаре, то
+		{
+			buff += bitstring.at(i); // добавляем в временную строку комбинацию
+		}
+		else
+		{
+			//Добавляем к строке "результат" 
+			result += to_binary_string(dictionary[buff], len(dictionary.size()));
+			result += bitstring.at(i);
+			dictionary[buff + bitstring.at(i)] = dictionary.size();
+			buff = "";
+		}
+	}
+	if (buff != "")
+		result += to_binary_string(dictionary[buff], len(dictionary.size()));
+	return result;
+}
+//вспомогательная функция, достает нам необходимую длину строки для to_binary_string
+int archive::len(int number)
+{
+	return ceil(log2(number));
+}
 
-	////Кусок кода для работы компрессора изнутри программы
-	//string input = "C:\\a\\w.txt";
-	//archive Archive(input, input + ".lzw");
-	//Archive.BuildDict();
-	//Archive.Compress();
+//Переводим тот ключик из словаря, и делаем из него бинарный код, запихиваем его в строку, возвращаем строку
+string archive::to_binary_string(unsigned long int n, int lenght)
+{
+	string result = "", buff;
+	//перевод числа в двоичную систему и запись ее в строку
+	do
+	{
+		//каждую итерацию мы записываем так, чтобы вышла инвертированная строка
+		buff = result; // обнуляем буфер
+		result = ('0' + (n % 2));
+		result += buff;
+		n = n / 2;
+	} while (n > 0);
+	while (result.size() < lenght)
+	{
+		result.insert(0, "0");
+	}
+	return result;
+}
+int main(int argc, char const* argv[])
+{
+	archive rar1; // создаем переменную рар
 
-	////Кусок кода для работы декомпрессора изнутри программы
-	//string output = "C:\\a\\w.txt.lzw";
-	//string input = output;
-	//for (int i = 0; i < 5; i++) {
-	//	input.pop_back();
-	//}
-	//archive Archive(input, output);
+	// получаем параметр
+	string parameter(argv[1]);
 
-	system("pause");
+	//выводим параметр
+	cout << parameter << endl;
+
+	if (parameter == "--decompress") // деархивация
+	{
+		string path_to_archive(argv[2]);
+		rar1.decompress(path_to_archive);
+		cout << argc - 2 << "files written." << endl;
+	}
+	if (parameter == "--compress") // архивация
+	{
+		rar1.compress(argv, argc);
+		cout << "Result written to " << argv[argc - 1] << endl;
+	}
 	return 0;
 }
